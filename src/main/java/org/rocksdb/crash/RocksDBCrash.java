@@ -34,7 +34,7 @@ public class RocksDBCrash  {
   @CommandLine.Option(names={"-k","--number-of-keys"}, description = "Number of keys to write per DB.")
   private int keys;
 
-  @CommandLine.Option(names={"-s", "--skip-keys"}, description = "Skip creating keys.")
+  @CommandLine.Option(names={"-s", "--skip-keys"}, description = "Skip creating keys.", defaultValue = "false")
   private boolean skipKeys;
 
   @CommandLine.Option(names={"-o", "--number-of-closes"}, description = "Number of open and closes in all.")
@@ -69,7 +69,7 @@ public class RocksDBCrash  {
       int runId = i;
       executorService.execute(() -> {
         int cont = new Random().nextInt(DBs);
-        File containerDir = new File(rootPath, "cont-" + cont);
+        File containerDir = new File(rootPath, "cont" + cont);
         DBOptions options = new DBOptions()
             .setCreateIfMissing(true)
             .setCreateMissingColumnFamilies(true);
@@ -86,6 +86,11 @@ public class RocksDBCrash  {
           db = RocksDB.open(options, containerDir.getAbsolutePath(),
               columnFamilyDescriptors, columnFamilyHandles);
           opened.incrementAndGet();
+          try {
+            Thread.sleep(5);
+          } catch (InterruptedException e) {
+            e.printStackTrace();
+          }
           if (!skipKeys) {
             Random random = new Random();
             for (int j = 0; j < keys; j++) {
@@ -100,13 +105,20 @@ public class RocksDBCrash  {
         } catch (Exception e) {
           collided.incrementAndGet();
         }
-
-
+        if (db != null) {
+          try {
+            db.flushWal(true);
+          } catch (RocksDBException e) {
+            e.printStackTrace();
+          }
+        }
 
         try {
-          if (db != null) {
-            db.pauseBackgroundWork();
-          }
+          Thread.sleep(5);
+        } catch (InterruptedException e) {
+          e.printStackTrace();
+        }
+        try {
           if (db != null) {
             db.close();
           }
@@ -125,7 +137,6 @@ public class RocksDBCrash  {
           System.out.println("Done with "+count.incrementAndGet());
         } catch (Exception e) {
           System.out.println("Hit exception during pause background work " + e);
-
         }
       });
     };
